@@ -1,7 +1,7 @@
 # Video Frame Grabber
 
 A simple, no-fuss tool to grab still frames from any video file right in your browser.
-No servers, no installs, no dependencies — just open the file and start grabbing.
+No servers, no installs, no dependencies... just open the file and start grabbing.
 
 ## Features
 
@@ -9,7 +9,7 @@ No servers, no installs, no dependencies — just open the file and start grabbi
 * Play, pause, and scrub through the video
 * Copy the current frame straight to your clipboard
 * Save a frame as a JPG with a timestamp in the filename
-* All processing happens in your browser — nothing is uploaded anywhere
+* All processing happens in your browser, nothing is uploaded anywhere
 
 ## How to Run
 
