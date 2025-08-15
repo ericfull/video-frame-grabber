@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Frame Grabber</title>
+    <style>
+        :root {
+            --background: #121212;
+            --surface: #1e1e1e;
+            --primary: #bb86fc;
+            --primary-variant: #3700b3;
+            --secondary: #03dac6;
+            --error: #cf6679;
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --text-disabled: rgba(255, 255, 255, 0.5);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--background);
+            color: var(--text-primary);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 800px;
+            background-color: var(--surface);
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(to right, var(--primary-variant), #000000);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 500;
+        }
+
+        .video-container {
+            width: 100%;
+            position: relative;
+            background-color: #000;
+            aspect-ratio: 16/9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #video-player {
+            max-width: 100%;
+            max-height: 100%;
+            display: none;
+        }
+
+        #upload-prompt {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
+        #upload-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .controls {
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .progress-container {
+            flex-grow: 1;
+            height: 8px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        #progress-bar {
+            height: 100%;
+            width: 0;
+            background-color: var(--primary);
+            border-radius: 4px;
+            transition: width 0.1s linear;
+        }
+
+        #time-display {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            min-width: 100px;
+            text-align: right;
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            padding: 0.75rem 1.25rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn:hover {
+            background-color: var(--secondary);
+            transform: translateY(-2px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background-color: rgba(255, 255, 255, 0.12);
+            color: var(--text-disabled);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+        }
+
+        #playback-btn {
+            min-width: 110px;
+        }
+
+        #canvas {
+            display: none;
+        }
+
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background-color: var(--surface);
+            color: var(--text-primary);
+            padding: 12px 24px;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+            display: none;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .control-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            #time-display {
+                text-align: left;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+        }
+
+        .frame-skip-btn {
+            background-color: var(--primary);
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            padding: 0.75rem;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center; /* Center the arrow */
+            width: 40px; /* Give it a fixed width */
+            height: 40px; /* Give it a fixed height */
+        }
+
+        .frame-skip-btn:hover {
+            background-color: var(--secondary);
+            transform: translateY(-2px);
+        }
+
+        .frame-skip-btn:active {
+            transform: translateY(0);
+        }
+
+        .frame-skip-btn:disabled {
+            background-color: rgba(255, 255, 255, 0.12);
+            color: var(--text-disabled);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Video Frame Grabber</h1>
+        </header>
+
+        <div class="video-container">
+            <video id="video-player" controls></video>
+            <div id="upload-prompt">
+                <div id="upload-icon">📁</div>
+                <p>Click to upload a video file</p>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-row">
+                <div class="progress-container" id="progress-container">
+                    <div id="progress-bar"></div>
+                </div>
+                <div id="time-display">00:00 / 00:00</div>
+            </div>
+
+            <div class="control-row">
+                <div class="button-group">
+                    <button id="playback-btn" class="btn" disabled>
+                        <span id="playback-icon">▶</span>
+                        <span>Play</span>
+                    </button>
+                    <button id="load-btn" class="btn">
+                        <span>Load Video</span>
+                    </button>
+                    <button id="frame-skip-back" class="btn frame-skip-btn" disabled title="Skip Back (Left Arrow)">
+                        &larr;
+                    </button>
+                    <button id="frame-skip-forward" class="btn frame-skip-btn" disabled title="Skip Forward (Right Arrow)">
+                        &rarr;
+                    </button>
+                </div>
+
+                <div class="button-group">
+                    <button id="copy-frame-btn" class="btn" disabled>
+                        <span>Copy Frame to Clipboard</span>
+                    </button>
+                    <button id="save-jpg-btn" class="btn" disabled>
+                        <span>Save as JPG</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+    <input type="file" id="file-input" accept="video/*,.avi">
+
+    <div class="notification" id="notification">
+        <div class="loading-spinner" id="loading-spinner"></div>
+        <span id="notification-message"></span>
+    </div>
+
+    <script>
+        // DOM Elements
+        const videoPlayer = document.getElementById('video-player');
+        const uploadPrompt = document.getElementById('upload-prompt');
+        const fileInput = document.getElementById('file-input');
+        const loadBtn = document.getElementById('load-btn');
+        const playbackBtn = document.getElementById('playback-btn');
+        const playbackIcon = document.getElementById('playback-icon');
+        const copyFrameBtn = document.getElementById('copy-frame-btn');
+        const saveJpgBtn = document.getElementById('save-jpg-btn');
+        const progressBar = document.getElementById('progress-bar');
+        const progressContainer = document.getElementById('progress-container');
+        const timeDisplay = document.getElementById('time-display');
+        const canvas = document.getElementById('canvas');
+        const notification = document.getElementById('notification');
+        const notificationMessage = document.getElementById('notification-message');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const frameSkipBackBtn = document.getElementById('frame-skip-back');
+        const frameSkipForwardBtn = document.getElementById('frame-skip-forward');
+
+        // Variables
+        let isPlaying = false;
+        let currentFileName = '';
+        let videoLoaded = false; // Track if a video is loaded
+
+        // Functions
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = Math.floor(seconds % 60);
+            return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
+
+        function updateProgress() {
+            if (videoPlayer.duration) {
+                const percentage = (videoPlayer.currentTime / videoPlayer.duration) * 100;
+                progressBar.style.width = `${percentage}%`;
+                timeDisplay.textContent = `${formatTime(videoPlayer.currentTime)} / ${formatTime(videoPlayer.duration)}`;
+            }
+        }
+
+        function togglePlayback() {
+            if (isPlaying) {
+                videoPlayer.pause();
+                playbackIcon.textContent = '▶';
+                playbackBtn.querySelector('span:not(#playback-icon)').textContent = 'Play';
+            } else {
+                videoPlayer.play();
+                playbackIcon.textContent = '⏸';
+                playbackBtn.querySelector('span:not(#playback-icon)').textContent = 'Pause';
+            }
+
+            isPlaying = !isPlaying;
+        }
+
+        function showNotification(message, duration = 3000, showSpinner = false) {
+            notificationMessage.textContent = message;
+            if (showSpinner) {
+                loadingSpinner.style.display = 'inline-block';
+            } else {
+                loadingSpinner.style.display = 'none';
+            }
+
+            notification.classList.add('show');
+
+            if (duration > 0) {
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                }, duration);
+            }
+
+            return {
+                hide: () => {
+                    notification.classList.remove('show');
+                }
+            };
+        }
+
+        function copyFrameToClipboard() {
+            if (!videoLoaded) return; // Don't copy if no video
+            // Prepare canvas with current video frame
+            canvas.width = videoPlayer.videoWidth;
+            canvas.height = videoPlayer.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(videoPlayer, 0, 0, canvas.width, canvas.height);
+
+            const notif = showNotification('Copying frame to clipboard...', 0, true);
+
+            // Try to use the new Clipboard API if available
+            if (navigator.clipboard && canvas.toBlob) {
+                canvas.toBlob(blob => {
+                    try {
+                        // For browsers that support clipboard.write with ClipboardItem
+                        if (navigator.clipboard.write) {
+                            const item = new ClipboardItem({ 'image/png': blob });
+                            navigator.clipboard.write([item]).then(() => {
+                                notif.hide();
+                                showNotification('Frame copied to clipboard!');
+                            }).catch(err => {
+                                console.error('Clipboard API error:', err);
+                                fallbackClipboardCopy(notif);
+                            });
+                        } else {
+                            fallbackClipboardCopy(notif);
+                        }
+                    } catch (err) {
+                        console.error('Clipboard API error:', err);
+                        fallbackClipboardCopy(notif);
+                    }
+                });
+            } else {
+                fallbackClipboardCopy(notif);
+            }
+        }
+
+        function fallbackClipboardCopy(notif) {
+            // Fallback to data URL for browsers without clipboard.write support
+            try {
+                const dataURL = canvas.toDataURL('image/png');
+
+                // Create a temporary link and click it to download the image
+                const link = document.createElement('a');
+                link.href = dataURL;
+                link.download = `video-frame-${new Date().getTime()}.png`;
+
+                notif.hide();
+                showNotification('Clipboard API not supported in your browser. Downloading image instead...');
+
+                link.click();
+            } catch (err) {
+                console.error('Fallback clipboard error:', err);
+                notif.hide();
+                showNotification('Unable to copy frame. Please try a different browser.');
+            }
+        }
+
+        function formatTimecode(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+
+            // Build timecode string, only including non-zero parts
+            let timecode = '';
+
+            if (hours > 0) {
+                timecode += `${hours}h-`;
+            }
+
+            if (hours > 0 || minutes > 0) {
+                timecode += `${minutes}m-`;
+            }
+
+            timecode += `${secs}s`;
+
+            return timecode;
+        }
+
+        function saveFrameAsJpg() {
+            if (!videoLoaded) return; // Don't save if no video
+            // Prepare canvas with current video frame
+            canvas.width = videoPlayer.videoWidth;
+            canvas.height = videoPlayer.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(videoPlayer, 0, 0, canvas.width, canvas.height);
+
+            const notif = showNotification('Saving frame as JPG...', 0, true);
+
+            try {
+                // Convert canvas to JPEG format (quality 0.9 = 90%)
+                const dataURL = canvas.toDataURL('image/jpeg', 0.9);
+
+                // Format the filename with original filename and timecode
+                const timecode = formatTimecode(videoPlayer.currentTime);
+                const filename = `${currentFileName}-${timecode}.jpg`;
+
+                // Create a temporary link and trigger download
+                const link = document.createElement('a');
+                link.href = dataURL;
+                link.download = filename;
+
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                notif.hide();
+                showNotification(`Frame saved as "${filename}"`);
+            } catch (err) {
+                console.error('Save JPG error:', err);
+                notif.hide();
+                showNotification('Unable to save frame as JPG. Please try a different browser.');
+            }
+        }
+
+        function skipFrames(direction) {
+            if (!videoLoaded || !videoPlayer.duration) return; // Only skip if video is loaded and has duration
+
+            const frameRate = 30;  // Approximate frame rate. HTML <video> doesn't expose the actual frame rate.
+            const frameDuration = 1 / frameRate;
+            let targetTime;
+
+            if (direction === 'back') {
+                targetTime = Math.max(0, videoPlayer.currentTime - frameDuration); // Ensure not negative
+            } else { // 'forward'
+                targetTime = Math.min(videoPlayer.duration, videoPlayer.currentTime + frameDuration); // Ensure not past end
+            }
+
+            // Setting currentTime might be slightly inaccurate, but it's the best we can do with HTML video
+            videoPlayer.currentTime = targetTime;
+
+            // If playing, pause briefly to ensure the frame update is visible
+            if (isPlaying) {
+                videoPlayer.pause();
+                // Optionally restart play after a short delay if desired
+                // setTimeout(() => videoPlayer.play(), 50);
+            }
+        }
+
+        // --- Event Listeners ---
+
+        uploadPrompt.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        loadBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const fileURL = URL.createObjectURL(file);
+                videoPlayer.src = fileURL;
+                videoPlayer.style.display = 'block';
+                uploadPrompt.style.display = 'none';
+
+                // Store the original filename without extension
+                currentFileName = file.name.replace(/\.[^/.]+$/, "");
+
+                // Reset state for new video
+                isPlaying = false;
+                playbackIcon.textContent = '▶';
+                playbackBtn.querySelector('span:not(#playback-icon)').textContent = 'Play';
+                progressBar.style.width = '0%';
+                timeDisplay.textContent = '00:00 / 00:00';
+
+
+                // Enable buttons once video metadata is loaded
+                videoPlayer.onloadedmetadata = () => {
+                    playbackBtn.disabled = false;
+                    copyFrameBtn.disabled = false;
+                    saveJpgBtn.disabled = false;
+                    frameSkipBackBtn.disabled = false;
+                    frameSkipForwardBtn.disabled = false;
+                    videoLoaded = true;
+                    updateProgress(); // Update time display immediately
+                    showNotification(`Loaded video: ${file.name}`);
+                };
+
+                // Handle potential loading errors
+                videoPlayer.onerror = () => {
+                    showNotification('Error loading video file.', 5000);
+                    // Reset UI
+                    videoPlayer.style.display = 'none';
+                    uploadPrompt.style.display = 'block';
+                    playbackBtn.disabled = true;
+                    copyFrameBtn.disabled = true;
+                    saveJpgBtn.disabled = true;
+                    frameSkipBackBtn.disabled = true;
+                    frameSkipForwardBtn.disabled = true;
+                    videoLoaded = false;
+                };
+            }
+        });
+
+        playbackBtn.addEventListener('click', togglePlayback);
+        copyFrameBtn.addEventListener('click', copyFrameToClipboard);
+        saveJpgBtn.addEventListener('click', saveFrameAsJpg);
+
+        videoPlayer.addEventListener('timeupdate', updateProgress);
+
+        videoPlayer.addEventListener('play', () => {
+            isPlaying = true;
+            playbackIcon.textContent = '⏸';
+            playbackBtn.querySelector('span:not(#playback-icon)').textContent = 'Pause';
+        });
+
+        videoPlayer.addEventListener('pause', () => {
+            isPlaying = false;
+            playbackIcon.textContent = '▶';
+            playbackBtn.querySelector('span:not(#playback-icon)').textContent = 'Play';
+        });
+
+        videoPlayer.addEventListener('ended', () => {
+            isPlaying = false;
+            playbackIcon.textContent = '▶';
+            playbackBtn.querySelector('span:not(#playback-icon)').textContent = 'Play';
+            videoPlayer.currentTime = 0; // Reset to beginning on end
+        });
+
+        progressContainer.addEventListener('click', (e) => {
+            if (!videoLoaded) return;
+            const rect = progressContainer.getBoundingClientRect();
+            const pos = (e.clientX - rect.left) / rect.width;
+            videoPlayer.currentTime = pos * videoPlayer.duration;
+        });
+
+        frameSkipBackBtn.addEventListener('click', () => skipFrames('back'));
+        frameSkipForwardBtn.addEventListener('click', () => skipFrames('forward'));
+
+        // --- Keyboard Hotkeys ---
+        document.addEventListener('keydown', (event) => {
+            // Ignore hotkeys if modifier keys are pressed (e.g., Ctrl+Left)
+            if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) {
+                return;
+            }
+
+            // Check if focus is on an input element (none in this app, but good practice)
+            const activeElement = document.activeElement;
+            if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.isContentEditable)) {
+                return;
+            }
+
+            // Handle arrow keys only if a video is loaded
+            if (videoLoaded) {
+                if (event.key === 'ArrowLeft') {
+                    event.preventDefault(); // Prevent potential browser scrolling
+                    skipFrames('back');
+                } else if (event.key === 'ArrowRight') {
+                    event.preventDefault(); // Prevent potential browser scrolling
+                    skipFrames('forward');
+                }
+                // Add other hotkeys here if needed (e.g., space for play/pause)
+                // else if (event.key === ' ' || event.code === 'Space') {
+                //     event.preventDefault();
+                //     togglePlayback();
+                // }
+            }
+        });
+
+
+        // Initialize
+        videoPlayer.controls = true; // Keep default controls for accessibility/fallback
+    </script>
+</body>
+</html>
